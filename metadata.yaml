@@ -34,17 +34,22 @@ authors:
 # doi: 10.5281/zenodo.#####
 
 # Copyright statement
-copyright: "2023, Association of Universities for Research in Astronomy, Inc. (AURA)"
+copyright: >-
+  2023, Association of Universities for Research in Astronomy, Inc. (AURA)
 
 # Description. A short, 1-2 sentence statemement used by document indices.
-description: "The Rubin Science Platform is composed of a large number of separate services, some following external standards such as IVOA and some providing internal protocols. The services available and the data behind them will vary by site and need to be discoverable by users. This tech note lists known discovery needs for both services and schemas and proposes an implementation plan for meeting those needs."
+description: >-
+  A survey of discovery requirements for the Rubin Science Platform with
+  proposed implementations.
 
 # Abstract, if available
-# abstract: >
-#           Write your paragraph
-#           here with multiple lines.
-#
-#           You can have multiple paragraphs too.
+abstract: >
+ The Rubin Science Platform is composed of a large number of separate
+ services, some following external standards such as IVOA and some providing
+ internal protocols. The services available and the data behind them will vary
+ by site and need to be discoverable by users. This tech note lists known
+ discovery needs for both services and schemas and proposes an implementation
+ plan for meeting those needs.
 
 # URL where this document is published by Read the Docs. e.g. http://sqr-001.lsst.codes
 url: "https://dmtn-250.lsst.io"

@@ -14,7 +14,7 @@ Discovery services for the Rubin Science Platform
 DMTN-250
 ========
 
-The Rubin Science Platform is composed of a large number of separate services, some following external standards such as IVOA and some providing internal protocols. The services available and the data behind them will vary by site and need to be discoverable by users. This tech note lists known discovery needs for both services and schemas and proposes an implementation plan for meeting those needs.
+A survey of discovery requirements for the Rubin Science Platform with proposed implementations.
 
 **Links:**
 
