@@ -29,7 +29,7 @@ The IVOA also defines a RegTAP_ protocol for searching the registry using the `T
 
 Each deployment of the Rubin Science Platform should provide an IVOA Registry advertising all IVOA services (and similar services for which it makes sense to write IVOA-compatible metadata) available in that deployment.
 Some Science Platform deployments may be registered with the `Registry of Registries`_.
-Others will not be, usually because they're for internal use only, but the local registry can still be used by local VO clients.
+Most will not be, usually because they're for internal use only, but the local registry can still be used by local VO clients.
 
 .. _Registry of Registries: https://www.ivoa.net/documents/Notes/RegistryOfRegistries/
 
@@ -279,21 +279,22 @@ The latter wraps the current EFD discovery service and provides methods to perfo
 We expect to want to add support for additional services to the lsst.rsp package, similar to the support for the TAP service.
 The exact details may depend on the service; there are a few options for what may be most convenient for the user:
 
-- A mechanism to obtain the URL of the service, leaving all other details including authentication to the user.
-  This gives the user the most flexibility, at the cost of only wrapping the discovery step and leaving authentication and all other details of service access to the user.
-  This is the approach taken by the existing ``lsst.rsp.get_tap_service``.
+#. A mechanism to obtain the URL of the service, leaving all other details including authentication to the user.
+   This gives the user the most flexibility, at the cost of only wrapping the discovery step and leaving authentication and all other details of service access to the user.
+   This is the approach taken by the existing ``lsst.rsp.get_tap_service``.
 
-- A way to initiate a third-party client with the details required to access a service.
-  For example, the helper function may return a PyVO_ client object with the service URL and authentication credentials already configured, or initiate the standard operation in a third-party client and return the results.
-  This is the approach taken by the existing ``lsst.rsp.retrieve_query``.
+#. A way to initiate a third-party client with the details required to access a service.
+   For example, the helper function may return a PyVO_ client object with the service URL and authentication credentials already configured, or initiate the standard operation in a third-party client and return the results.
+   This is the approach taken by the existing ``lsst.rsp.retrieve_query``.
 
-- Provide a full-fledged client for the service, which manages the connection and authentication and provides methods to perform all supported operations for that service.
-  This is the approach taken by lsst_efd_client_.
+#. Provide a full-fledged client for the service, which manages the connection and authentication and provides methods to perform all supported operations for that service.
+   This is the approach taken by lsst_efd_client_.
 
 There is no one solution that makes sense for every service.
-Which approach we take for a service depends on the details of that service, the availability of third-party libraries, and the anticipated use cases of users.
+Options 2 or 3 will make sense for some services but not others, depending on the details of that service, the availability of third-party libraries, and the anticipated use cases of users.
 
-However, we can support, for every service, the first, most basic level of support: return the URL of the named service in the local Science Platform, if it exists.
+However, we can (and should) support option 1 for every service: return the URL of the named service in the local Science Platform, if it exists.
+We can also support asking for a list of all services known to be running on the local instance of the Science Platform, where the result is a simple list of parameters that could be passed into the function asking for the URL.
 This can wrap calls to the IVOA registry for VO services and other calls or sources of knowledge for non-VO services that don't make sense to register with the IVOA registry.
 
-Rather than add a new function like ``lsst.rsp.get_tap_service`` for each individual service, it probably makes sense to provide a more generic interface, such as ``get_service_url``, that takes one of an enumerated list of services and returns the URL for that service if it is available.
+Rather than add a new function like ``lsst.rsp.get_tap_service`` for each individual service, this should be provided more generically, such as a ``get_service_url`` function that takes one of an enumerated list of services and returns the URL for that service if it is available.
