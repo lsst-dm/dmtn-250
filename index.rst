@@ -73,7 +73,7 @@ We therefore only need to populate the ``TAP_SCHEMA`` table and serve it through
 
 .. _TAP: https://www.ivoa.net/documents/TAP/
 
-Observation data will be served by a separate ObsTAP_ service that needs its own ``TAP_SCHEMA`` table containing only the schema supported by that TAP service.
+Pre-data-release observation data will be served by a separate ObsTAP_ service that needs its own ``TAP_SCHEMA`` table containing only the schema supported by that TAP service.
 See :dmtn:`236` for more information about the ObsTAP design.
 
 .. _ObsTAP: https://www.ivoa.net/documents/ObsCore/
@@ -95,11 +95,11 @@ Currently, that schema does not contain RegTAP_ schema, since we're not serving 
 When we start doing so, we can incorporate that schema into the ``TAP_SCHEMA`` table generated from the `sdm_schemas repository`_.
 In order to serve the RegTAP data itself out of the same MySQL service used for ``TAP_SCHEMA``, we may have to make additional modifications to the TAP service to add additional backend data sources.
 
-How to provide ``TAP_SCHEMA`` for the ObsTAP service is not yet clear.
-The simplest approach will be if the PostgreSQL backend for ObsTAP can itself provide a ``TAP_SCHEMA`` table as well.
+How to provide ``TAP_SCHEMA`` for the pre-data-release ObsTAP services is not yet resolved.
+The intended long-term approach is for the PostgreSQL backend for ObsTAP to provide a ``TAP_SCHEMA`` table as well.
 Then, the ObsTAP service can use a single backend for all data.
 
-If that's not possible, we will need to create a separate obstap-schema Phalanx service and build a separate set of MySQL images that contain the ObsCore schemas instead of the schemas for the regular TAP service.
+In the short term, until support for adding the ``TAP_SCHEMA`` table to the ObsTAP has been written, we will need to create a separate ``obstap-schema`` Phalanx service and build a separate set of MySQL images that contain the ObsCore schemas instead of the schemas for the regular TAP service.
 
 DataLink metadata
 =================
