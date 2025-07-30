@@ -1,0 +1,21 @@
+[technote]
+id = "DMTN-250"
+series_id = "DMTN"
+canonical_url = "https://dmtn-250.lsst.io/"
+github_url = "https://github.com/lsst-dm/dmtn-250"
+github_default_branch = "main"
+date_created = "2023-01-31"
+date_updated = "2025-07-30"
+organization.name = "Vera C. Rubin Observatory"
+organization.ror = "https://ror.org/048g3cy84"
+license.id = "CC-BY-4.0"
+
+[[technote.authors]]
+name = {given = "Russ", family = "Allbery"}
+internal_id = "allberyr"
+orcid = "https://orcid.org/0009-0009-9491-8923"
+
+[[technote.authors.affiliations]]
+name = "Vera C. Rubin Observatory Project Office"
+internal_id = "RubinObs"
+ror = "https://ror.org/048g3cy84"
