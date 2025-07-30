@@ -1,11 +1,12 @@
-:tocdepth: 1
+#################################################
+Discovery services for the Rubin Science Platform
+#################################################
 
-Abstract
-========
+.. abstract::
 
-The Rubin Science Platform is composed of a large number of separate services, some following external standards such as IVOA and some providing internal protocols.
-The services available and the data behind them will vary by site and need to be discoverable by users.
-This tech note lists known discovery needs for both services and schemas and proposes an implementation plan for meeting those needs.
+   The Rubin Science Platform is composed of a large number of separate services, some following external standards such as IVOA and some providing internal protocols.
+   The services available and the data behind them will vary by site and need to be discoverable by users.
+   This tech note lists known service discovery and schema discovery needs and proposes an implementation plan for meeting those needs.
 
 In some cases, this discovery service has already been implemented.
 In other cases, this design is tentative and is likely to change during implementation.
