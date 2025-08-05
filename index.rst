@@ -31,6 +31,7 @@ Applications running on an instance of the Rubin Science Platform often need to 
 - Nublado_ needs the URL to Gafaelfawr to log users out and the URL to the Nublado controller to manage user labs.
 - The `Qserv Kafka bridge`_ needs the URL to Gafaelfawr to get user quota information and the base URL for datalinker to rewrite TAP query output columns to point to the correct datalinker service.
 - Squareone_ uses the base URL to construct a variety of URLs for various internal services, including Gafaelfawr, the Portal, and Nublado.
+  In the future, Squareone will use service discovery to determine what services are available in a given environment, and will customize its pages based on that information.
 - All TAP servers (``tap``, ``ssotap``, ``livetap``, ``consdbtap``) need the URL to Gafaelfawr's token endpoint to get user information.
 - `Times Square`_ needs the URL to Noteburst to run notebooks and the URL to its UI in Squareone to construct links for GitHub PRs.
 - Unfurlbot_ needs the URL to the JIRA data proxy.
