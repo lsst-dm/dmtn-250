@@ -234,6 +234,33 @@ In addition, there are two other collections of data associated with the TAP sch
   This metadata is derived from the table schemas maintained in sdm_schemas_.
   That derived metadata needs to be made available to those services.
 
+.. _use-case-docs:
+
+Documentation
+-------------
+
+We embed URLs to services in several generated documentation sites:
+
+- `Phalanx <https://phalanx.lsst.io/>`_ (in various places), derived from the Phalanx configuration itself.
+- `Sasquatch <https://sasquatch.lsst.io/environments.html>`__, maintained by hand.
+- `rsp.lsst.io <https://rsp.lsst.io/>`__, manually maintained in JSON format.
+
+Documentation sites need statically-generated information for multiple environments, so cannot easily use the service discovery API directly.
+Ideally, however, the links in documentation should be built on the same underlying data and automatically propagate to all documentation sites when the underlying data changes.
+
+rsp.lsst.io currently uses the following information for each environment:
+
+- Name, short title, and long title
+- Parent domain
+- Squareone URL
+- Portal URL
+- Nublado URL
+- API URL
+- TAP URL
+- Gafaelfawr token UI URL
+- Times Square URL
+- Phalanx documentation URL
+
 Implementation proposal
 =======================
 
@@ -245,7 +272,7 @@ The list of services enabled for that instance, and any other required metadata 
 Using that data, as well as Phalanx configuration and secrets, Repertoire will then provide the various service and data discovery APIs as described below.
 Repertoire will not do any data discovery or dynamic analysis of the environment; all data that it provides must come from its Phalanx confiugration and built-in rules to derive service URLs from Phalanx configuration information.
 
-Repertoire will also provide a client library, available from PyPI as ``rubin-rsp-repertoire``, that can be used to easily query Repertoire for service and data discovery implementation.
+Repertoire will also provide a client library, available from PyPI as ``rubin-repertoire``, that can be used to easily query Repertoire for service and data discovery implementation.
 
 .. _implementation-internal:
 
@@ -510,6 +537,24 @@ To satisfy the third point, Repertoire will have a read/write account to the und
 The TAP servers will use a separate read-only account.
 Permissions setup will also be done by Repertoire, as the service that manages the ``TAP_SCHEMA`` database.
 Account creation will be done via Terraform in https://github.com/lsst/idf_deploy.
+
+.. _implementation-docs:
+
+Documentation
+-------------
+
+Phalanx_ has all of the information required to determine the URLs of every configured service in every Phalanx environment, since the source for all of Repertoire's information comes from its Phalanx configuration.
+To make this information available for documentation sites, it needs to be published statically.
+
+Repertoire will be designed as a service wrapping a library included in ``rubin-repertoire``.
+That library will accept, as input, the merged Repertoire configuration for a given Phalanx environment, and will return the service discovery results.
+
+As part of its documentation build process, Phalanx will use that library to generate a JSON file containing the static service discovery data for each environment.
+That JSON file will be published as part of the Phalanx documentation site at a known URL.
+Other documentation sites, such as rsp.lsst.io_ and Sasquatch_, can then retrieve that file during build time and use it as input to pages that provide information about different Phalanx environments.
+
+.. _rsp.lsst.io: https://rsp.lsst.io/
+.. _Sasquatch: https://sasquatch.lsst.io/
 
 Appendix: State as of 2025-07-31
 ================================
