@@ -128,6 +128,14 @@ The JupyterLab extensions added by Nublado (as opposed to helper libraries inten
   It also needs to know the base URL for JupyterHub, although this is not precisely a service discovery case since this is another component of the same service.
 - The ``firefly`` extension requires the URL to the Portal.
 
+Nublado tutorials
+^^^^^^^^^^^^^^^^^
+
+The ``tutorials`` JupyterLab extension needs to know the structure of the tutorials GitHub repository so that it can assemble a menu for the user.
+This is not directly related to Phalanx service discovery (the source information is at GitHub), but the way the information is currently being assembled is awkward and requires updating a directory on a shared NFS mount.
+
+Since Repertoire provides a service that can cache and provide this information on demand, it may make sense for it to provide an endpoint that can be used by all user labs, avoiding the need to store the data in a shared file system or assemble it for each lab separately.
+
 .. _use-case-helpers:
 
 Python helper library
@@ -352,15 +360,17 @@ Passing information to JavaScript
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Since there is no need for the non-EFD service discovery endpoint to require authentication, JavaScript extensions could request and parse service discovery information directly.
-However, this would require handling CORS properly, since when per-user subdomains are enabled this would be a cross-site request, and would also present a chicken-and-egg problem of passing the service discovery URL to the client JavaScript in the first place.
-
-To simplify the web security issues, the Nublado-extended JupyterLab should provide a proxy endpoint that provides limited service discovery information to clients, backed by a call to Repertoire from inside the server side of the extension.
 Currently, this only applies to the ``savequit`` extension, which needs the logout URL.
 (The Firefly extension already has its own internal mechanism for service discovery of the Portal.)
-This proxy can therefore be limited to only that URL, and can be extended later if required for new extensions.
+This would allow the server side of the Nublado extensions to drop its handlers for providing service discovery information.
 
 The other place that a service discovery URL is used, the ``displayversion`` extension, should be replaced with Python code that calculates the version information (including the base hostname of the Science Platform) to display on the JupyterLab server side and provides the already-calculated string to a much more minimalist JavaScript extension.
 That base hostname can be retrieved on the JupyterLab server side from Repertoire.
+
+Nublado tutorials
+^^^^^^^^^^^^^^^^^
+
+Although it is somewhat unrelated to the rest of the service discovery problem, Repertoire should also provide the URL to the tutorials repository for that instance of the Science Platform (if there is one), and provide structure information for that repository that can be used by the ``tutorials`` extension to construct a menu.
 
 .. _implementation-helpers:
 
@@ -540,6 +550,9 @@ This environment variable is injected by the Nublado controller into the enivonr
 All other paths are hard-coded relative to that setting.
 
 The Firefly extension is configured with the environment variable ``FIREFLY_URL``, set by ``lsst.rsp.startup``.
+
+Information about the structure of the Nublado tutorials repository is currently maintained by a cron job run by the Nublado Phalanx application that writes into a shared NFS directory.
+That information is then cached locally in the user's home directory and provided to the extension by a JupyterLab server-side handler.
 
 Python helper library
 ---------------------
