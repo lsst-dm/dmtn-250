@@ -274,6 +274,10 @@ Repertoire will not do any data discovery or dynamic analysis of the environment
 
 Repertoire will also provide a client library, available from PyPI as ``rubin-repertoire``, that can be used to easily query Repertoire for service and data discovery implementation.
 
+At least for now, Repertoire will not provide availability information.
+We have other plans related to availability and will initially develop that as a separate system with its own tech note.
+Once that work is complete, we will evaluate whether it makes sense to integrate some availability information into service discovery.
+
 .. _implementation-internal:
 
 Internal service discovery
