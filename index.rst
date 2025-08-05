@@ -159,20 +159,44 @@ In all cases, these helpers should use an underlying service discovery service a
 This hides more complexity from the user, and provides us with more implementation flexibility, than if the user used the discovery service and its library directly.
 For VO services, users could instead query the registry directly with PyVO_, but this is a somewhat complex interface that we want to simplify and all available services may not be registered with IVOA registries or representable in that service discovery system
 
-.. _use-case-efd:
+.. _use-case-sasquatch:
+
+Sasquatch
+---------
+
+Sasquatch provides InfluxDB databases for several purposes.
+Writes to those databases by services will generally be done via Kafka, and service discovery for Kafka for services should be done via strimzi-access-operator, thus only requiring service discovery for the Confluent Schema Registry.
+However, query access to the InfluxDB databases from, for example, notebooks will require service discovery of the available databases and their paths and connection information.
+
+InfluxDB databases require authentication.
+Currently, we use username/password authentication, so a client that wants to query the InfluxDB database needs some mechanism to acquire that password.
+
+Service discovery for Sasquatch InfluxDB databases should then return the following information:
+
+- InfluxDB URL (some clients prefer this as hostname, port, and path, so provide it in both forms)
+- Schema registry URL
+- Username
+- Password
+
+The advertised InfluxDB databases should be filtered by the user's scopes.
+For example, the application metrics InfluxDB database should only be available to environment administrators, not to general users of the environment.
 
 EFD
----
+^^^
 
 The Engineering Facilities Database is used internal to Rubin Observatory for information used by project staff, such as telemetry from sensors and devices on the summit and performance metrics for the processing pipeline.
-Unlike most other Science Platform use cases, it's often necessary for a user running a notebook in the Notebook Aspect of one Science Platform to connect to the EFD service provided by a different instance of the Science Platform (connecting to the USDF EFD from the Summit, for example).
+Unlike most other Science Platform use cases, we currently support accessing an InfluxDB EFD database hosted in one Phalanx instance from a different Phalanx instance (the USDF EFD database from the Summit, for instance).
 
 When a user wants to access the EFD, by default they should be directed to the local instance.
-However, if they request a specific instance, they should be directed to that instance.
+However, if they request a specific instance and that instance is available from their local instance, they should be directed to that instance.
 
-The EFD also requires authentication.
-Those credentials, uniquely among the services discussed in this tech note, may be for a service running at a separate Science Platform instance.
-The user should be able to authenticate with their local credentials and obtain the authentication credentials to use for the remote EFD.
+The InfluxDB credentials may therefore be for a service running at a separate Science Platform instance.
+This use case is specific to InfluxDB.
+The user should be able to authenticate with their local credentials and obtain the authentication credentials to use for the remote database (generally a remote EFD).
+
+.. note::
+
+   We should reconsider whether the remote access case is truly necessary, since supporting it increases the complexity of the system and requires syncing passwords between environments.
 
 .. _use-case-tap-schema:
 
@@ -255,7 +279,7 @@ The service discovery client library will, based on integration experience, prov
 Service discovery should not be used for configuration specific to one Phalanx application, such as the location of an application-specific PostgreSQL database or the URL of the Qserv used by an instance of the Qserv Kafka bridge.
 It should only be used for locating other services within the same instance of the Rubin Science Platform.
 Similarly, service discovery should not be used for secrets; for those, use `Phalanx secrets management <https://phalanx.lsst.io/developers/helm-chart/define-secrets.html>`__.
-(The EFD is a special exception; see :ref:`use-case-efd` and :ref:`implementation-efd`.)
+(The EFD is a special exception; see :ref:`use-case-sasquatch` and :ref:`implementation-sasquatch`.)
 
 Continue to use the secrets provided by ``strimzi-access-operator`` for service discovery of the Kafka bootstrap servers rather than using Repertoire.
 
@@ -412,25 +436,35 @@ Here is an incomplete list in addition ot ``EXTERNAL_INSTANCE_URL``:
 
 Dropping those environment variables will cause old versions of the helper functions to stop working, so we may have to keep them for some time for backwards compatibility.
 
-.. _implementation-efd:
+.. _implementation-sasquatch:
 
-EFD
----
+Sasquatch
+---------
 
-Repertoire will take over the function of Segwarides_.
-It will support retrieving the connection information of any supported EFD by name, or retrieving the default (local) EFD name and connection information.
+Repertoire will take over the function of Segwarides_ and extend that functionality to support discovery of all local InfluxDB databases.
+For remote EFD access, it will also support retrieving, by name, the connection information of any remote EFD accessible from that environment, as well as retrieving the default (local) EFD name and connection information.
 
 .. _Segwarides: https://github.com/lsst-sqre/segwarides
 
-This API will be a separate authenticated API using Gafaelfawr token authentication.
-The EFD discovery information will not be included in the regular internal service discovery because it is not (necessarily) an internal service and because that information is not useful without the authentication credentials.
+Sasquatch database discovery will be a separate authenticated API using Gafaelfawr token authentication.
+Sasquatch discovery information, with one exception, will not be included in the regular internal service discovery because it is not (necessarily) an internal service and because that information is not useful without the authentication credentials.
+That one exception is the Confluent Schema Registry, which is not part of the service discovery information provided by strimzi-access-operator.
+
+Visibility of a Sasquatch database may be restricted by role.
+The role check should be performed by Repertoire itself to avoid the unnecessarily complex ingress configuration required for Gafaelfawr to perform the role check.
 
 For the time being, we will continue to use username and password authentication for the connection to the underlying InfluxDB instance.
 Repertoire will return a static read-only username and password on request as part of the response to the authenticated service discovery request.
+We will use strimzi-access-operator to manage that account and make it available to Repertoire for databases within the same Phalanx environment.
 
-This will require duplicating the authentication information for every EFD in each environment from which EFD connections are supported.
+For remote EFD access, we will have to duplicate the authentication information for every EFD in each environment from which EFD connections are supported.
 For the time being, this will require manual duplication of that information between the 1Password vaults for the various environments.
 The connection information is not secret and can be recorded in the :file:`values.yaml` file for the Repertoire Helm chart.
+
+.. note::
+
+   We should attempt to limit cross-environment access to InfluxDB databases as much as possible.
+   It is complex to manage in our security model.
 
 Once this is deployed, Segwarides will be permanently retired, so all existing uses of Segwarides will need to switch to Repertoire.
 
@@ -527,8 +561,8 @@ They aren't exported from the top level but aren't marked as private functions, 
 
 lsst-rsp also provides the ``RSPClient`` class, which is a subclass of ``httpx.AsyncClient`` that preconfigures authentication and a suitable base URL for a given service, based on ``EXTERNAL_INSTANCE_URL``.
 
-EFD
----
+Sasquatch
+---------
 
 Currently, the Segwarides_ service running in Roundtable_ provides both discovery and authentication credentials for all EFD instances.
 A client, at any Science Platform (or outside of any of them), tells Segwarides what EFD they want to connect to, and Segwarides returns the connection and authentication information for that EFD instance.
@@ -541,6 +575,8 @@ Normally, this is done via lsst-efd-client_.
 This approach has two problems.
 First, it requires running a global Segwarides service, which in turn creates cross-domain authentication issues that we are currently ignoring.
 Second, this architecture does not support the desired property of directing the user to the local instance by default, since it doesn't know which instance is local.
+
+Currently, we do not provide service discovery for non-EFD InfluxDB databases, except via strimzi-access-operator to other services in the same environment.
 
 TAP schemas and associated metadata
 -----------------------------------
