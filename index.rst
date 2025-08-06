@@ -173,19 +173,24 @@ For VO services, users could instead query the registry directly with PyVO_, but
 Sasquatch
 ---------
 
-Sasquatch provides InfluxDB databases for several purposes.
-Writes to those databases by services will generally be done via Kafka, and service discovery for Kafka for services should be done via strimzi-access-operator, thus only requiring service discovery for the Confluent Schema Registry.
-However, query access to the InfluxDB databases from, for example, notebooks will require service discovery of the available databases and their paths and connection information.
+Sasquatch provides Kafka and InfluxDB databases for several purposes.
 
+Service discovery of Kafka, which is also the mechanism used for writing to InfluxDB, should be done via strimzi-access-operator.
+The secret created by strimzi-access-operator covers all of the required information except for the Confluent Schema Registry, for those applications that use Avro schemas.
+The address of the Confluent Schema Registry can be handled via :ref:`use-case-internal`.
+
+Query access to the InfluxDB databases from, for example, notebooks will require service discovery of the available databases and their paths and connection information.
 InfluxDB databases require authentication.
 Currently, we use username/password authentication, so a client that wants to query the InfluxDB database needs some mechanism to acquire that password.
 
-Service discovery for Sasquatch InfluxDB databases should then return the following information:
+Service discovery for Sasquatch InfluxDB databases should therefore return the following information:
 
 - InfluxDB URL (some clients prefer this as hostname, port, and path, so provide it in both forms)
-- Schema registry URL
 - Username
 - Password
+
+Because a password is included, this service discovery API, unlike the API for internal service discovery more generally, must be authenticated.
+Clients that also need the Confluent Schema Registry URL should discover that through the regular internal service discovery API.
 
 The advertised InfluxDB databases should be filtered by the user's scopes.
 For example, the application metrics InfluxDB database should only be available to environment administrators, not to general users of the environment.
@@ -200,7 +205,7 @@ When a user wants to access the EFD, by default they should be directed to the l
 However, if they request a specific instance and that instance is available from their local instance, they should be directed to that instance.
 
 The InfluxDB credentials may therefore be for a service running at a separate Science Platform instance.
-This use case is specific to InfluxDB.
+This use case is specific to the EFD.
 The user should be able to authenticate with their local credentials and obtain the authentication credentials to use for the remote database (generally a remote EFD).
 
 .. note::
@@ -483,25 +488,23 @@ Dropping those environment variables will cause old versions of the helper funct
 Sasquatch
 ---------
 
-Repertoire will take over the function of Segwarides_ and extend that functionality to support discovery of all local InfluxDB databases.
+Repertoire will take over the InfluxDB database discovery function of Segwarides_ and extend that functionality to support discovery of all local InfluxDB databases.
 For remote EFD access, it will also support retrieving, by name, the connection information of any remote EFD accessible from that environment, as well as retrieving the default (local) EFD name and connection information.
 
 .. _Segwarides: https://github.com/lsst-sqre/segwarides
 
-Sasquatch database discovery will be a separate authenticated API using Gafaelfawr token authentication.
-Sasquatch discovery information, with one exception, will not be included in the regular internal service discovery because it is not (necessarily) an internal service and because that information is not useful without the authentication credentials.
-That one exception is the Confluent Schema Registry, which is not part of the service discovery information provided by strimzi-access-operator.
+InfluxDB database discovery will be a separate authenticated API using Gafaelfawr token authentication.
+InfluxDB information will not be included in the regular internal service discovery because it is not useful without the authentication credentials (which cannot be provided via the unauthenticated route) and is not (necessarily) an internal service.
 
-Visibility of a Sasquatch database may be restricted by role.
+Visibility of the discovery and authentication information for an InfluxDB database may be restricted by role.
 The role check should be performed by Repertoire itself to avoid the unnecessarily complex ingress configuration required for Gafaelfawr to perform the role check.
 
 For the time being, we will continue to use username and password authentication for the connection to the underlying InfluxDB instance.
 Repertoire will return a static read-only username and password on request as part of the response to the authenticated service discovery request.
-We will use strimzi-access-operator to manage that account and make it available to Repertoire for databases within the same Phalanx environment.
 
-For remote EFD access, we will have to duplicate the authentication information for every EFD in each environment from which EFD connections are supported.
-For the time being, this will require manual duplication of that information between the 1Password vaults for the various environments.
-The connection information is not secret and can be recorded in the :file:`values.yaml` file for the Repertoire Helm chart.
+For remote EFD access, we will have to duplicate the password information for every EFD in each environment from which EFD connections are supported.
+For the time being, this will require manual copying of that password between the 1Password vaults for the various environments.
+The connection information, apart from the password, is not secret and can be recorded in the :file:`values.yaml` file for the Repertoire Helm chart.
 
 .. note::
 
@@ -560,6 +563,8 @@ Other documentation sites, such as rsp.lsst.io_ and Sasquatch_, can then retriev
 
 .. _rsp.lsst.io: https://rsp.lsst.io/
 .. _Sasquatch: https://sasquatch.lsst.io/
+
+The username and password information for InfluxDB databases will not be included in this JSON file, since the JSON file is available without authentication and its contents will be incorporated into public documentation.
 
 Appendix: State as of 2025-07-31
 ================================
@@ -639,7 +644,7 @@ This approach has two problems.
 First, it requires running a global Segwarides service, which in turn creates cross-domain authentication issues that we are currently ignoring.
 Second, this architecture does not support the desired property of directing the user to the local instance by default, since it doesn't know which instance is local.
 
-Currently, we do not provide service discovery for non-EFD InfluxDB databases, except via strimzi-access-operator to other services in the same environment.
+We do not currently provide service discovery for non-EFD InfluxDB databases.
 
 TAP schemas and associated metadata
 -----------------------------------
@@ -655,7 +660,7 @@ This approach has multiple serious problems:
 - It is a waste of resources to run an entire MySQL server to serve a small handful of static tables, let alone a separate MySQL server per TAP server.
 - Authentication to this database is handled poorly.
 - The MySQL image used for those containers is not systematically kept up to date.
-- The Science Platform has a policy of not including database servers for production instances, instead requiring all database services to be provided and maintained by the infrastructure provider.
+- The Science Platform has a policy of not including database servers (except for the special case of InfluxDB) for production instances, instead requiring all database services to be provided and maintained by the infrastructure provider.
 
 This approach does have the advantage that these containers are built for every pull request as well as every tag, and thus satisfy the requirement that unreleased schemas can be easily tested in non-production environments.
 
