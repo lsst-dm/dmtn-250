@@ -566,6 +566,29 @@ Other documentation sites, such as rsp.lsst.io_ and Sasquatch_, can then retriev
 
 The username and password information for InfluxDB databases will not be included in this JSON file, since the JSON file is available without authentication and its contents will be incorporated into public documentation.
 
+.. _dynamic:
+
+Dynamic service discovery
+=========================
+
+There are two main ways to handle service discovery, static and dynamic.
+
+Static service discovery uses only information injected via Phalanx to determine the expected list of services and their URLs.
+This will always reflect intended reality and is much easier to implement, but is less suited for general use of Phalanx for purposes other than the Rubin Science Platform.
+Adding new recognized services to a static scheme requires at least Phalanx changes to the Repertoire service and possibly code changes to Repertoire itself.
+
+Dynamic service discovery discovers the available services at execution time.
+For Kubernetes environments, this can reuee the mechanism Kubernetes itself has for service discovery: Kubernetes resources created and managed by each application.
+In the case of Phalanx, the logical Kubernetes object to use for this purpose is ``GafaelfawrIngress``, since we create at least one ``GafaelfawrIngress`` for every HTTP-accessible service in order to enforce authentication and authorization rules.
+The ``GafaelfawrIngress`` resource could be supplemented with additional configuration parameters describing service discovery information, such as datasets served by that ingress.
+The drawback of dynamic discovery is that if the resource underlying it goes missing, this error is potentially indistinguishable from an intentional configuration omitting that service, which could result in services dynamically reconfiguring themselves for the lack of a service instead of reporting errors.
+
+The plan for Repertoire is to start with static service discovery, since this is simpler and a strict improvement over the existing Phalanx approach.
+Then, once that's working, we will add dynamic service discovery to support easy addition of new services not recognized by the Repertoire code base.
+Repertoire can then compare the static configuration to the results of dynamic discovery and send alerts when they don't match.
+
+Implementation of dynamic service discovery will probably be done via Gafaelfawr's Kubernetes operator, since it already has to scan all ``GafaelfawrIngress`` resources in a given Phalanx deployment.
+
 Code organization and Python versions
 =====================================
 
