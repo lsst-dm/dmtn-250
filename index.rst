@@ -566,6 +566,40 @@ Other documentation sites, such as rsp.lsst.io_ and Sasquatch_, can then retriev
 
 The username and password information for InfluxDB databases will not be included in this JSON file, since the JSON file is available without authentication and its contents will be incorporated into public documentation.
 
+Code organization and Python versions
+=====================================
+
+Repertoire will be maintained as a combined server and client in a vertical monorepo (see :sqr:`075`).
+The client must be available as a regular Python package on PyPI so that it can be used as a dependency of other services.
+
+To support the :ref:`documentation use case <use-case-docs>`, the client package will also provide the logic to construct the list of services and endpoints based on a configuration.
+This will allow the client to provide a library that can be called during the Phalanx documentation build process to construct the JSON file published with the Phalanx documentation.
+See :ref:`implementation-docs` for more information.
+
+Minimum Python version
+----------------------
+
+The Repertoire client must be callable inside the kernel of a Nublado notebook, so it must be installable into the Python environment used by that kernel.
+This means that it must be compatible with the Python version used by the Science Pipelines stack, which usually lags considerably behind the Python version used for other Phalanx services.
+Since most of the logic will live in the client, this means Repertoire as a whole, unlike other Phalanx services, will need to support the Python version used by the current Science Pipelines release.
+For example, at the time this was written Phalanx services are using Python 3.13, but the Science Pipelines stack is still using Python 3.12.
+
+This has an annoying implication for any client returned by the Repertoire client, such as a smart, model-aware client for services like Gafaelfawr_ or Wobbly_.
+A simple implementation would require all of those clients to support the Science Pipelines version of Python as well, thus spreading the requirement to support older versions of Python.
+That, in turn, would create problems for the corresponding services.
+For example, ideally one would maintain the client and server together in a single `uv workspace`_, but doing so limits testing to the intersection of supported Python versions, thus either forcing the server to support old Python versions or preventing testing of the client on the older Python version.
+
+.. _Gafaelfawr: https://gafaelfawr.lsst.io/
+.. _Wobbly: https://github.com/lsst-sqre/wobbly
+.. _uv workspace: https://docs.astral.sh/uv/concepts/projects/workspaces/
+
+Our strong preference when supporting Phalanx services is to routinely upgrade the minimum Python version to the latest release and make aggressive use of new features.
+We therefore want to minimize the amount of code that has to maintain compatibility with older Python versions.
+
+Therefore, we will provide a separate version of a Repertoire client, with limited functionality, that is intended for use within Nublado notebooks.
+This version would not support returning full clients for any of our internal services, only the clients we expect to be used by astronomers.
+This client would be maintained as a separate project, distinct from the regular Repertoire client used by other services and by the Repertoire server.
+
 Appendix: State as of 2025-07-31
 ================================
 
