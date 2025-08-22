@@ -362,6 +362,13 @@ Repertoire will therefore also provide an OAI-PNH service (on a different URL th
 For astronomer-facing installations of the Rubin Science Platform, this service will be public so that it can be queried by VO searchable registries and the Registry of Registries.
 This API may require authentication on other instances of the Rubin Science Platform where VO services are not intended to be available to the astronomy community.
 
+.. note::
+
+   We may want to move this code into a separate service that retrieves internal service discovery information from Repertoire and handles the IVOA XML formatting and simple search functionality of a publishing registry.
+   The drawback of doing that is that we then have to worry about inconsistencies and caching between Repertoire and the new service, and have introduced some additional complexity.
+   The advantage is that it keeps the XML and OAI-PNW code out of the core service discovery service.
+   It's not yet clear whether the separation will be worth it; hopefully it will become more clear once we have started the implementation.
+
 Only VO services that should be advertised to the astronomy community will be included in the OAI-PNH API.
 This will therefore be a subset of the list of services and datasets contained in the internal service registry, but augmented with the additional metadata required by VOResource.
 
