@@ -645,6 +645,21 @@ Therefore, we will provide a separate version of a Repertoire client, with limit
 This version would not support returning full clients for any of our internal services, only the clients we expect to be used by astronomers.
 This client would be maintained as a separate project, distinct from the regular Repertoire client used by other services and by the Repertoire server.
 
+UWS services
+------------
+
+UWS-based services such as vo-cutouts_ are implemented with most of their logic in Safir.
+The Safir library family also provides the code that is installed in the worker backend to construct and manage the worker.
+Safir therefore has to be compatible with the Python version used by Science Pipelines containers.
+
+Since the Repertoire client will be developed with the latest version of Python, following the pattern for SQuaRE-developed service code rather than the pattern for Safir, the Safir UWS code cannot depend on the internal Repertoire client.
+The client intended for notebook use is not appropriate for UWS services, since it won't contain information about internal services such as Wobbly.
+UWS services will therefore have to continue to use pre-service-discovery methods for finding the Wobbly URL.
+
+.. note::
+
+   UWS services will not be able to use service discovery until we change the backend design to further isolate the Science Pipelines backend from Safir code and can then relax the minimum version constraint for Safir and allow it to depend on the Repertoire client.
+
 Appendix: State as of 2025-07-31
 ================================
 
