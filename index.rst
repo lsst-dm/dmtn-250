@@ -199,18 +199,16 @@ EFD
 ^^^
 
 The Engineering Facilities Database is used internal to Rubin Observatory for information used by project staff, such as telemetry from sensors and devices on the summit and performance metrics for the processing pipeline.
-Unlike most other Science Platform use cases, we currently support accessing an InfluxDB EFD database hosted in one Phalanx instance from a different Phalanx instance (the USDF EFD database from the Summit, for instance).
+Unlike most other Science Platform use cases, we support accessing an InfluxDB EFD database hosted in one Phalanx instance from a different Phalanx instance.
+Currently, this is only used to access the USDF EFD database from the Summit.
 
 When a user wants to access the EFD, by default they should be directed to the local instance.
 However, if they request a specific instance and that instance is available from their local instance, they should be directed to that instance.
+Repertoire should manage global human-readable names for the EFD instances so that users can determine which EFD database they are connecting to and, in the case of the summit to USDF connection, request a specific one by name.
 
 The InfluxDB credentials may therefore be for a service running at a separate Science Platform instance.
 This use case is specific to the EFD.
 The user should be able to authenticate with their local credentials and obtain the authentication credentials to use for the remote database (generally a remote EFD).
-
-.. note::
-
-   We should reconsider whether the remote access case is truly necessary, since supporting it increases the complexity of the system and requires syncing passwords between environments.
 
 .. _use-case-tap-schema:
 
