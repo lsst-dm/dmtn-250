@@ -326,6 +326,23 @@ It should only be used for locating other services within the same instance of t
 Similarly, service discovery should not be used for secrets; for those, use `Phalanx secrets management <https://phalanx.lsst.io/developers/helm-chart/define-secrets.html>`__.
 (The EFD is a special exception; see :ref:`use-case-sasquatch` and :ref:`implementation-sasquatch`.)
 
+Path prefixes for services
+--------------------------
+
+Most Phalanx services written by SQuaRE support configuring the path prefix at which they listen.
+That configuration is exposed via :file:`values.yaml` in their Phalanx configuration.
+
+In order for service discovery to support reconfiguration of the default paths, Repertoire either has to use dynamic service discovery (see :ref:`dynamic`) and use that to update its expectations of service paths, or it needs to consume the Phalanx configuration for every service.
+The latter is very awkward given the structure of Phalanx and the restrictions of Argo CD and would require a lot of complexity that seems likely to cause longer-term issues.
+
+.. note::
+
+   For the time being, service discovery will ignore custom path prefix configurations and therefore will be incorrect for Phalanx environments that use that configuration.
+   We will revisit this when adding dynamic service discovery.
+
+Kafka
+-----
+
 Continue to use the secrets provided by ``strimzi-access-operator`` for service discovery of the Kafka bootstrap servers rather than using Repertoire.
 
 For the time being, applications that manage Avro schemas should continue to hard-code the internal URL of the Confluent Schema Registry into their configuration rather than using service discovery.
