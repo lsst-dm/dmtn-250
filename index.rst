@@ -8,9 +8,10 @@ Discovery services for the Rubin Science Platform
    The services available and the data behind them will vary by site and need to be discoverable by users.
    This tech note lists known service discovery and schema discovery needs and proposes an implementation plan for meeting those needs.
 
-In some cases, this discovery service has already been implemented.
-In other cases, this design is tentative and is likely to change during implementation.
-Each implementation section describes the current state for that discovery service.
+This tech note was the original design document for service discovery.
+While it has been lightly updated to reflect the implementation, it is primarily useful as a design and background document rather than as a guide to the implementation.
+
+For current documentation of service discovery, see the `Repertoire documentation <https://repertoire.lsst.io>`__.
 
 Use cases
 =========
@@ -21,6 +22,7 @@ Internal service discovery
 --------------------------
 
 Applications running on an instance of the Rubin Science Platform often need to know the URLs of other services running on the same instance.
+Here are some examples:
 
 - datalinker_ needs the URL of the SODA cutout service to add to service descriptors included in the DataLink_ record returned by the ``{links}`` endpoint.
 - The service that generates the HiPS list (see :ref:`use-case-hips-list`) needs to know the base URL of the HiPS service to retrieve and assemble the :file:`properties` files.
@@ -106,7 +108,7 @@ HiPS list generation
 
 HiPS data for a given data release is stored in Google Cloud Storage buckets.
 Currently, this data is served by a trivial proxy named crawlspace_ that retrieves the data from GCS using private credentials and returns it to the user.
-Eventually we hope to add authentication support to the native GCS mechanism for serving files via HTTPS directly and do away with this proxy.
+Eventually we hope to add authentication support to the native GCS mechanism for serving files via HTTPS directly and do away with this proxy (see :dmtn:`230`).
 
 .. _crawlspace: https://github.com/lsst-sqre/crawlspace
 
@@ -166,7 +168,8 @@ Options 2 or 3 will make sense for some services but not others, depending on th
 
 In all cases, these helpers should use an underlying service discovery service and library to determine if a given combination of dataset is available in this instance of the Rubin Science Platform and, if so, return one of the four possible objects listed above.
 This hides more complexity from the user, and provides us with more implementation flexibility, than if the user used the discovery service and its library directly.
-For VO services, users could instead query the registry directly with PyVO_, but this is a somewhat complex interface that we want to simplify and all available services may not be registered with IVOA registries or representable in that service discovery system
+For VO services, users could instead query the registry directly with PyVO_, but this is a somewhat complex interface that we want to simplify.
+Also, all available services may not be registered with IVOA registries or representable in that service discovery system
 
 .. _use-case-sasquatch:
 
@@ -185,14 +188,14 @@ Currently, we use username/password authentication, so a client that wants to qu
 
 Service discovery for Sasquatch InfluxDB databases should therefore return the following information:
 
-- InfluxDB URL (some clients prefer this as hostname, port, and path, so provide it in both forms)
+- InfluxDB URL
 - Username
 - Password
 
 Because a password is included, this service discovery API, unlike the API for internal service discovery more generally, must be authenticated.
 Clients that also need the Confluent Schema Registry URL should discover that through the regular internal service discovery API.
 
-The advertised InfluxDB databases should be filtered by the user's scopes.
+The advertised InfluxDB databases should be filtered by the user's scopes and, optionally, the user's group membership.
 For example, the application metrics InfluxDB database should only be available to environment administrators, not to general users of the environment.
 
 EFD
@@ -225,10 +228,12 @@ We often want to use different versions of the published schema in different Sci
 We therefore need a mechanism to populate the ``TAP_SCHEMA`` database used by each TAP server with the schema from a release tag or branch of the sdm_schemas_ repository.
 Changes to the contents of that repository should be atomic with respect to user queries: either they get the old schema or the new schema, but not an inconsistent intermediate result.
 
+Design of ``TAP_SCHEMA`` management is discussed in :sqr:`107` and is therefore not further discussed in this technote.
+
 Additional TAP metadata
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-In addition, there are two other collections of data associated with the TAP schema:
+There are two other collections of data associated with the TAP schema:
 
 - If certain database columns are included in a TAP result, that result should contain additional service descriptors that point the user to other services that may be used in combination with that data.
   This addition is done by the TAP server when constructing the result footer, but the metadata for what service descriptors to include is maintained in sdm_schemas_.
@@ -237,6 +242,23 @@ In addition, there are two other collections of data associated with the TAP sch
 - Some services that wrap TAP queries need to know what sets of columns to include in their results and how to order those columns.
   This metadata is derived from the table schemas maintained in sdm_schemas_.
   That derived metadata needs to be made available to those services.
+
+.. _use-case-landing:
+
+Landing page
+------------
+
+The Rubin Science Platform has a landing page for users, normally provided by Squareone_.
+That page provides links to various services, including a list of all API services with documentation links and short descriptions and information about the user's quotas.
+
+Currently, this information is maintained in multiple places.
+Squareone should be able to query service discovery for all the relevant information for the local environment, including:
+
+- A description of each available dataset
+- Available service APIs by dataset
+- Short descriptions and documentation links for each API
+- Required scopes for that service, so that services can be hidden for users who do not have the necessary access
+- A mapping of Gafaelfawr quota labels to services and short descriptions, to help explain the effect of a user's quotas, or to flag a quota as not being relevant to show directly to a user
 
 .. _use-case-docs:
 
@@ -268,11 +290,11 @@ rsp.lsst.io currently uses the following information for each environment:
 Implementation proposal
 =======================
 
-Most service and data discovery services will be handled by a new FastAPI application, tenatively named Repertoire.
+Most service and data discovery services will be handled by a new FastAPI application named Repertoire.
 Repertoire will be deployed, as a Phalanx application, in each instance of the Rubin Science Platform that requires service and data discovery.
-Since this includes mobu, it will be part of the ``infrastructure`` application group and normally deployed on every Science Platform instance.
+It will be part of the ``infrastructure`` application group and normally deployed on every Science Platform instance.
 
-The list of services enabled for that instance, and any other required metadata about the host or URL layout of that instance, will be injected into Repertoire by Phalanx via Argo CD.
+The list of services enabled for that instance, metadata about the Phalanx environment, and any other required metadata about the host or URL layout of that instance, will be injected into Repertoire by Phalanx via Argo CD.
 Using that data, as well as Phalanx configuration and secrets, Repertoire will then provide the various service and data discovery APIs as described below.
 Repertoire will not do any data discovery or dynamic analysis of the environment; all data that it provides must come from its Phalanx confiugration and built-in rules to derive service URLs from Phalanx configuration information.
 
@@ -299,28 +321,28 @@ Repertoire will then construct a data model with the following components:
 - For each service that queries or otherwise interacts with a dataset, a map of service name to datasets to service API URLs.
   For the Butler server, as a special case, this will be the URL from which the Butler client configuration for that dataset can be retrieved.
   Services that share the same URL for all datasets will have a mapping for every known dataset.
-  By default, the key should match the name of the Phalanx application.
-  In cases where there is more than one service provided by the same Phalanx application, append ``-`` and an additional qualifier.
 - For services that will never have separate per-dataset URLs, such as the Portal or Nublado, a mapping from service names to base URLs.
-- A simple list of all deployed services (Phalanx application names) for the use of mobu and other services that need to know a complete list of what is deployed in that instance of the Rubin Science Platform, even if it does not have an API URL.
+- A simple list of all deployed Phalanx application names for the use of mobu and other services that need to know a complete list of what is deployed in that instance of the Rubin Science Platform, even if it does not have an API URL.
 
 .. note::
 
-   It's not clear whether to name specific services in the service discovery API model or to model the services as a mapping of generic service names to datasets to URLs.
-   The advantage of the former is that we can attach documentation for how to use the result for a specific service and limit the discovered services to ones with known semantics, thus discouraging dumping arbitrary mappings into service discovery and creating a backwards-compatibility burden.
-   The drawback of the former is that a revision of the Repertoire service and client library would be required to add a new service, and the client would have to be updated in all callers that needed to know about the new service, including user notebook environments.
+   The service discovery model maps generic service names and datasets to service URLs.
+   The service name may not be obviously related to the Phalanx application name, since the service name identifies a general capability and the Phalanx application name identifies a specific implemenation.
+   For example, the service name of ``tap`` may be provided by one of several different Phalanx applications, depending on the nature of the underlying dataset.
 
-Finally, the URL to the service discovery API should be injected into every Phalanx application that may need service discovery, replacing the current injection of ``global.baseUrl``.
+Finally, the URL to the service discovery API should be injected into every Phalanx application that may need service discovery as ``global.repertoireUrl``, replacing the current injection of ``global.baseUrl``.
 Applications are encouraged to use the service discovery client library instead of making direct calls to the service discovery endpoint and parsing the results.
-The service discovery client library will, based on integration experience, provide a simple API to retrieve and cache discovery information and return an appropriate URL or pre-configured client for another Phalanx service.
 
-.. note::
+The service discovery client library for other services (as distinct from the :ref:`helpers for user notebooks <use-case-helpers>`) will return the URL of the API or UI provided by the service, not a fully-configured client for that service.
+Services that have their own client libraries should have those client libraries depend on ``rubin-repertoire`` and use service discovery within the library to find the service's URL.
 
-   The exact API of the client library is left unspecified so that it can be formed through implementation experience.
-   When it has stabilized, this tech note will be updated with a link to the API documentation.
+Service discovery information will be cached by the library and periodically revalidated.
+Services that use service discovery information to create derived objects, such as a configured Butler factory, should recreate those derived objects when service discovery information changes.
 
 Service discovery should not be used for configuration specific to one Phalanx application, such as the location of an application-specific PostgreSQL database or the URL of the Qserv used by an instance of the Qserv Kafka bridge.
-It should only be used for locating other services within the same instance of the Rubin Science Platform.
+This should still be handled by Phalanx values files.
+Service discovery should only be used for locating other services within the same instance of the Rubin Science Platform.
+
 Similarly, service discovery should not be used for secrets; for those, use `Phalanx secrets management <https://phalanx.lsst.io/developers/helm-chart/define-secrets.html>`__.
 (The EFD is a special exception; see :ref:`use-case-sasquatch` and :ref:`implementation-sasquatch`.)
 
@@ -343,8 +365,8 @@ Kafka
 
 Continue to use the secrets provided by ``strimzi-access-operator`` for service discovery of the Kafka bootstrap servers rather than using Repertoire.
 
-For the time being, applications that manage Avro schemas should continue to hard-code the internal URL of the Confluent Schema Registry into their configuration rather than using service discovery.
-This may be switched to service discovery once authentication has been implemented.
+For the time being, applications that manage Avro schemas should continue to get the internal URL of the Confluent Schema Registry from their Phalanx configuration rather than using service discovery.
+This may be switched to service discovery in the future.
 
 .. _implementation-vo:
 
@@ -357,26 +379,18 @@ The first step of implementing VO service discovery will therefore be to ensure 
 Then, Repertoire, knowing the API URLs of the services and the services deployed in a given instance of the Rubin Science Platform (see :ref:`implementation-internal`), along with additional configured metadata to flesh out the VOResource records, can construct the records for a VO publishing registry for that instance of the Rubin Science Platform.
 
 Repertoire will therefore also provide an OAI-PNH service (on a different URL than internal service discovery).
-For astronomer-facing installations of the Rubin Science Platform, this service will be public so that it can be queried by VO searchable registries and the Registry of Registries.
-This API may require authentication on other instances of the Rubin Science Platform where VO services are not intended to be available to the astronomy community.
-
-.. note::
-
-   We may want to move this code into a separate service that retrieves internal service discovery information from Repertoire and handles the IVOA XML formatting and simple search functionality of a publishing registry.
-   The drawback of doing that is that we then have to worry about inconsistencies and caching between Repertoire and the new service, and have introduced some additional complexity.
-   The advantage is that it keeps the XML and OAI-PNW code out of the core service discovery service.
-   It's not yet clear whether the separation will be worth it; hopefully it will become more clear once we have started the implementation.
+For astronomer-facing installations of the Rubin Science Platform, this service will be public and registered with the Registry of Registries so that it can be queried by VO searchable registries.
 
 Only VO services that should be advertised to the astronomy community will be included in the OAI-PNH API.
 This will therefore be a subset of the list of services and datasets contained in the internal service registry, but augmented with the additional metadata required by VOResource.
 
-There are several Python OAI-PNH implementations that may be useful as a starting point:
+There are several Python OAI-PNH implementations that we evaluated as part of this design:
 
 - `IVOA publishing registry code <https://github.com/ivoa/publishing-registry>`__
 - `NOIRLab VO registry <https://gitlab.com/nsf-noirlab/csdc/vo-services/noirlab-vo-registry>`__
 - `pyoai <https://pypi.org/project/pyoai/>`__
 
-Given the tight integration with internal service discovery and the desire to avoid manual metadata collection processes in favor of dynamically generating the OAI-PNH information based on internal service discovery, it is unlikely that any of these implementations can be used as-is, but they may be useful as a basis for the Repertoire implementation.
+Given the tight integration with internal service discovery and the desire to avoid manual metadata collection processes in favor of dynamically generating the OAI-PNH information based on internal service discovery, none of these implementations were usable as-is, but they informed the Repertoire implementation.
 
 .. _implementation-hips:
 
@@ -390,7 +404,8 @@ For each environment with a HiPS service, Repertoire will be configured with a l
 As part of its internal service discovery implementation, it will know the base URL to the HiPS service for that RSP environment.
 It will retrieve the :file:`properties` files for each tree and assemble them into one HiPS list file per dataset.
 
-We will hopefully be able to retire the legacy ``/api/hips/list`` API as part of the transition to Repertoire.
+For now, Repertoire also has to support the legacy ``/api/hips/list`` API.
+We will either drop that or replace it with a different approach that collects HiPS files from multiple datasets in the future.
 
 .. _implementation-nublado:
 
@@ -400,16 +415,16 @@ Nublado extensions
 Any environment variables set for the use of Nublado extensions will also become part of the user's environment and therefore implicitly become a user-facing API that imposes an ongoing, long-term maintenance burden.
 We should therefore minimize the use of environment variables whenever possible, preferring approaches that do not leak into the user environment, unless the environment variable is intended to be a user-facing API.
 
-Both the server side of the Nublado extensions and the user-facing Python helper library (see :ref:`implementation-helpers`) will need to know how to query service discovery.
-This makes that one URL part of the user-facing API and therefore reasonable to provide in an environment variable.
-That environment variable will be ``RUBIN_SERVICE_DISCOVERY_URL`` and be provided by the Nublado controller, which in turn will be configured with the service discovery URL of its Science Platform instance via its Helm chart.
+User notebooks will use a separate static copy of service discovery information mounted in the notebook when it is spawned and containing only the information needed by the service discovery helper library and exposed to users.
+We should encourage notebooks to use that service discovery information, via the helper library, and not use ``rubin-repertoire`` or the main service discovery endpoint directly, since that information may change more frequently and contains information that should be irrelevant to user notebooks.
+Therefore, the URL for service discovery for the Nublado extensions should be configured without leaking the Repertoire URL to the user's notebook kernel.
 
 Firefly
 ^^^^^^^
 
 The Firefly extension supports configuring the URL to the Portal through the JupyterLab configuration.
 This avoids making that configuration part of the user-facing API, so we should use this in preference to setting an environment variable.
-Lab startup should use ``RUBIN_SERVICE_DISCOVERY_URL`` to discovery the base URL for the Portal and then set the appropriate JupyterLab configuration variable (``Firefly.url``).
+Lab startup should use service discovery the base URL for the Portal and then set the appropriate JupyterLab configuration variable (``Firefly.url``).
 
 Previously, we set the ``FIREFLY_URL`` environment variable.
 We should drop that setting if possible, since environment variables will become implicit user-facing APIs accidentally.
@@ -422,6 +437,7 @@ Since there is no need for the non-EFD service discovery endpoint to require aut
 Currently, this only applies to the ``savequit`` extension, which needs the logout URL.
 (The Firefly extension already has its own internal mechanism for service discovery of the Portal.)
 This would allow the server side of the Nublado extensions to drop its handlers for providing service discovery information.
+However, it's not clear whether this would be worth the effort of introducing a JavaScript Repertoire client (probably by using the version developed for Squareone).
 
 The other place that a service discovery URL is used, the ``displayversion`` extension, should be replaced with Python code that calculates the version information (including the base hostname of the Science Platform) to display on the JupyterLab server side and provides the already-calculated string to a much more minimalist JavaScript extension.
 That base hostname can be retrieved on the JupyterLab server side from Repertoire.
@@ -438,42 +454,11 @@ Python helper library
 
 The requirement use cases can be simplified to two: a standard, flexible API that can be used with an arbitrary service that may or may not have a dedicated client (except for the Butler as discussed below), and per-service APIs that return an initialized client for that service.
 
-For the first case, provide two functions via lsst-rsp_ that are implemented for all services except the Butler:
-
-``get_rsp_service_url(SERVICE, DATASET)``
-    Get the base URL of the API for SERVICE when querying or working with DATASET.
-
-``get_rsp_httpx_client(SERVICE, DATASET)``
-    Get an HTTPX_ client configured with the user's token and the base URL for SERVICE when querying or working with DATASET.
-    HTTPX is consistent with other Rubin Science Platform code and allows easy extension to async, but returning a Requests_ client may be more standard.
-    This may warrant some further thought.
-
-.. _HTTPX: https://www.python-httpx.org/
-.. _Requests: https://docs.python-requests.org/en/latest/index.html
-
-.. note::
-
-   It's not clear whether the name of the service should be an enum or an arbitrary string.
-   The advantage of an enum is that it discourages putting random things in service discovery and exposing them to a user API, thus unintentionally creating a backwards-compatibility burden.
-   It also allows quick identification of typos.
-   The drawback is a lack of flexibility: A change to the lsst-rsp library would be required for the addition of each new service, and older images with older installed libraries would not be able to get information about newer services.
-   This is a similar problem to the question of how to construct the Repertoire service discovery model: whether to use a mapping of arbitrary service names to URLs or to make the API model aware of the names of the specific services that can be found via service discovery if they are supported.
-
-In addition, for services with a good client that we want to support and encourage, there will be additional helper functions that return a pre-configured client for that service.
-For example:
-
-``get_rsp_siav2_service(DATASET)``
-    Return a PyVO SIAv2 client configured for the Rubin Science Platform and the given dataset.
-
-``get_rsp_tap_service(DATASET)``
-    Return a PyVO TAP client configured for the Rubin Science Platform and the given dataset.
-
-This proposal uses a standard ``get_rsp_`` prefix for all functions at the cost of having to deprecate all of the existing helpers.
-This would be at least the third round of deprecation.
-An alternative would be to keep the ``get_tap_service`` and ``get_siav2_service`` method names and continue with that pattern for other services, avoiding yet another deprecation round.
+This has been implemented via the `lsst.rsp.RSPDiscovery` class.
+See its documentation for more details.
 
 The Butler client is a special case: It already expects a dataset name and uses the environment variable ``DAF_BUTLER_REPOSITORY_INDEX`` to configure itself.
-Ideally it should eventually switch to using service discovery and the Repertoire library, but Repertoire only supports the Butler server, not the local Butler used in some Phalanx environments.
+Ideally it should use service discovery, but Repertoire only supports the Butler server not the local Butler used in some Phalanx environments.
 For the time being, we won't change how Butler does service discovery, and we will live with the duplication of dataset information between the Butler configuration and Repertoire.
 
 ``EXTERNAL_INSTANCE_URL``
@@ -518,8 +503,9 @@ For remote EFD access, it will also support retrieving, by name, the connection 
 InfluxDB database discovery will be a separate authenticated API using Gafaelfawr token authentication.
 InfluxDB information will not be included in the regular internal service discovery because it is not useful without the authentication credentials (which cannot be provided via the unauthenticated route) and is not (necessarily) an internal service.
 
-Visibility of the discovery and authentication information for an InfluxDB database may be restricted by role.
-The role check should be performed by Repertoire itself to avoid the unnecessarily complex ingress configuration required for Gafaelfawr to perform the role check.
+Visibility of the discovery and authentication information for an InfluxDB database may be restricted by scope and group.
+``read:sasquatch`` is the scope used to protect the ingress.
+If some databases should only be accessible to a subset of users with the ability to get InfluxDB database credentials, Repertoire should perform an additional group check.
 
 For the time being, we will continue to use username and password authentication for the connection to the underlying InfluxDB instance.
 Repertoire will return a static read-only username and password on request as part of the response to the authenticated service discovery request.
@@ -540,33 +526,17 @@ Once this is deployed, Segwarides will be permanently retired, so all existing u
 TAP schemas and associated metadata
 -----------------------------------
 
-The goals for a replacement approach are:
+See :sqr:`107` for the details of TAP schema management.
 
-- Configure the current versions of all TAP schemas in only one place.
-- Serve associated metadata that matches the version of the TAP schema being deployed.
-- Move the TAP schema database out of an ad hoc MySQL container and into the underlying infrastructure database.
-  For data.lsst.cloud, this means Cloud SQL, matching how the UWS database is now handled.
-
-TAP schema management conceptually could be separated from the other aspects of service discovery discussed here.
-For the time being, I've chosen to combine them.
-Primarily this is for convenience and to minimize the number of Phalanx services we need to deploy, although there is also some overlap in data and concepts.
-Both systems have to track what data sets are available, for example.
+For the additional associated metadata, the goal for a replacement approach is to serve the associated metadata that matches the version of the TAP schema being deployed from Repertoire, since Repertoire is now the component that knows what version of the TAP schema is in use.
 
 The new proposed design is as follows:
 
 #. The Helm chart for Repertoire, via the normal Phalanx :file:`values.yaml` mechanism, specifies the version of the TAP schema to use for each TAP service.
-#. On startup, Repertoire will retrieve the TAP schema and associated metadata from the sdm_schemas_ repository and cache it.
-#. On startup, Repertoire will convert the TAP schema to the necessary database data for the ``TAP_SCHEMA`` database for each TAP server and, if necessary, modify the corresponding infrastructure database contents to match.
-   This will require using Felis_ as a library to generate the data.
+   This is already implemented in :sqr:`107`.
+#. On startup, Repertoire will retrieve the associated metadata from the sdm_schemas_ repository and cache it.
 #. The TAP servers and the datalinker_ server (or its successor when the microservices are moved to other services) will retrieve the metadata they use from Repertoire's API.
    This data may be cached locally but should be refreshed periodically so that those services do not require a restart to pick up new data.
-
-.. _Felis: https://felis.lsst.io/
-
-To satisfy the third point, Repertoire will have a read/write account to the underlying infrastructure database that allows it to replace the contents of the ``TAP_SCHEMA`` database.
-The TAP servers will use a separate read-only account.
-Permissions setup will also be done by Repertoire, as the service that manages the ``TAP_SCHEMA`` database.
-Account creation will be done via Terraform in https://github.com/lsst/idf_deploy.
 
 .. _implementation-docs:
 
@@ -582,6 +552,7 @@ That library will accept, as input, the merged Repertoire configuration for a gi
 As part of its documentation build process, Phalanx will use that library to generate a JSON file containing the static service discovery data for each environment.
 That JSON file will be published as part of the Phalanx documentation site at a known URL.
 Other documentation sites, such as rsp.lsst.io_ and Sasquatch_, can then retrieve that file during build time and use it as input to pages that provide information about different Phalanx environments.
+An :file:`index.json` file will be provided so that those documentation sites can get a list of known Phalanx environments during their build process.
 
 .. _rsp.lsst.io: https://rsp.lsst.io/
 .. _Sasquatch: https://sasquatch.lsst.io/
@@ -606,7 +577,7 @@ The ``GafaelfawrIngress`` resource could be supplemented with additional configu
 The drawback of dynamic discovery is that if the resource underlying it goes missing, this error is potentially indistinguishable from an intentional configuration omitting that service, which could result in services dynamically reconfiguring themselves for the lack of a service instead of reporting errors.
 
 The plan for Repertoire is to start with static service discovery, since this is simpler and a strict improvement over the existing Phalanx approach.
-Then, once that's working, we will add dynamic service discovery to support easy addition of new services not recognized by the Repertoire code base.
+Then, once that's working, we will consider adding dynamic service discovery to support easy addition of new services not recognized by the Repertoire code base.
 Repertoire can then compare the static configuration to the results of dynamic discovery and send alerts when they don't match.
 
 Implementation of dynamic service discovery will probably be done via Gafaelfawr's Kubernetes operator, since it already has to scan all ``GafaelfawrIngress`` resources in a given Phalanx deployment.
@@ -624,26 +595,10 @@ See :ref:`implementation-docs` for more information.
 Minimum Python version
 ----------------------
 
-The Repertoire client must be callable inside the kernel of a Nublado notebook, so it must be installable into the Python environment used by that kernel.
-This means that it must be compatible with the Python version used by the Science Pipelines stack, which usually lags considerably behind the Python version used for other Phalanx services.
+The Repertoire client must be callable from a Nublado JupyterHub plugin.
+This means that it must be compatible with the Python version used by the Zero to JupyterHub image, which usually lags considerably behind the Python version used for other Phalanx services.
 Since most of the logic will live in the client, this means Repertoire as a whole, unlike other Phalanx services, will need to support the Python version used by the current Science Pipelines release.
-For example, at the time this was written Phalanx services are using Python 3.13, but the Science Pipelines stack is still using Python 3.12.
-
-This has an annoying implication for any client returned by the Repertoire client, such as a smart, model-aware client for services like Gafaelfawr_ or Wobbly_.
-A simple implementation would require all of those clients to support the Science Pipelines version of Python as well, thus spreading the requirement to support older versions of Python.
-That, in turn, would create problems for the corresponding services.
-For example, ideally one would maintain the client and server together in a single `uv workspace`_, but doing so limits testing to the intersection of supported Python versions, thus either forcing the server to support old Python versions or preventing testing of the client on the older Python version.
-
-.. _Gafaelfawr: https://gafaelfawr.lsst.io/
-.. _Wobbly: https://github.com/lsst-sqre/wobbly
-.. _uv workspace: https://docs.astral.sh/uv/concepts/projects/workspaces/
-
-Our strong preference when supporting Phalanx services is to routinely upgrade the minimum Python version to the latest release and make aggressive use of new features.
-We therefore want to minimize the amount of code that has to maintain compatibility with older Python versions.
-
-Therefore, we will provide a separate version of a Repertoire client, with limited functionality, that is intended for use within Nublado notebooks.
-This version would not support returning full clients for any of our internal services, only the clients we expect to be used by astronomers.
-This client would be maintained as a separate project, distinct from the regular Repertoire client used by other services and by the Repertoire server.
+For example, at the time this was written, Phalanx services are using Python 3.14, but the Zero to JupyterHub image is still using Python 3.12.
 
 UWS services
 ------------
@@ -652,13 +607,13 @@ UWS-based services such as vo-cutouts_ are implemented with most of their logic 
 The Safir library family also provides the code that is installed in the worker backend to construct and manage the worker.
 Safir therefore has to be compatible with the Python version used by Science Pipelines containers.
 
-Since the Repertoire client will be developed with the latest version of Python, following the pattern for SQuaRE-developed service code rather than the pattern for Safir, the Safir UWS code cannot depend on the internal Repertoire client.
-The client intended for notebook use is not appropriate for UWS services, since it won't contain information about internal services such as Wobbly.
-UWS services will therefore have to continue to use pre-service-discovery methods for finding the Wobbly URL.
+Since the Repertoire client itself depends on Safir for some infrastructure, such as rich exceptions, using Repertoire within the Safir UWS code (or, for that matter, the Kafka code that needs to talk to the Confluent Schema Registry) creates a circular dependency.
 
-.. note::
+We will resolve this by splitting the portions of Safir that are usable by other libraries into a separate ``safir-core`` PyPI package.
+The Repertoire client (and other service clients) will then depend on ``safir-core``, and the main Safir library can, in turn, depend on the Repertoire client and on ``safir-core``.
+Service will continue to depend on ``safir`` and get both the core and service support functionality.
 
-   UWS services will not be able to use service discovery until we change the backend design to further isolate the Science Pipelines backend from Safir code and can then relax the minimum version constraint for Safir and allow it to depend on the Repertoire client.
+Until that work is complete, UWS services will have to continue to use pre-service-discovery methods for finding the Wobbly URL.
 
 Appendix: State as of 2025-07-31
 ================================
@@ -730,7 +685,6 @@ Currently, the Segwarides_ service running in Roundtable_ provides both discover
 A client, at any Science Platform (or outside of any of them), tells Segwarides what EFD they want to connect to, and Segwarides returns the connection and authentication information for that EFD instance.
 Normally, this is done via lsst-efd-client_.
 
-.. _Segwarides: https://github.com/lsst-sqre/segwarides
 .. _Roundtable: https://roundtable.lsst.io/
 .. _lsst-efd-client: https://efd-client.lsst.io/
 
@@ -747,6 +701,7 @@ Schemas for the Rubin Science Platform are managed using Felis_ from metadata st
 As part of the build process of that repository, Felis generates MySQL tables holding the schema information and bundles them into a Docker image for a MySQL server that contains only the ``TAP_SCHEMA`` table.
 This server is deployed in Phalanx_ as the tap-schema application, and the TAP server is configured to point to it.
 
+.. _Felis: https://felis.lsst.io/
 .. _Phalanx: https://phalanx.lsst.io/
 
 This approach has multiple serious problems:
